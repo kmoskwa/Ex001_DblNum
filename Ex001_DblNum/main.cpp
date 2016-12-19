@@ -1,8 +1,13 @@
 
+#include <iostream>
+
 #include <QtCore/QCoreApplication>
 #include <qdebug>
 #include <qstring>
 #include <qlist>
+#include <QFile>
+
+//extern ostream cout;
 
 
 class DblNum
@@ -10,18 +15,26 @@ class DblNum
 public:
   DblNum(void);
   virtual ~DblNum(void);
+  void iterateExamples(void);
+  void iterateAll(void);
 protected:
 private:
   void initExamples(void);
-  QMap<qlonglong, QString> _examples;
+  QFile outputFile;
+  QString outNumber(quint64 value);
+  QMap<quint64, QString> _examples;
 };
 
 DblNum::DblNum(void)
 {
+  initExamples();
+  outputFile.setFileName("out.txt");
+  outputFile.open(QIODevice::WriteOnly | QIODevice::Text);
 }
 
 DblNum::~DblNum(void)
 {
+  outputFile.close();
 }
 
 void DblNum::initExamples(void)
@@ -48,10 +61,60 @@ void DblNum::initExamples(void)
   _examples[0x7fefffffffffffff] = "(1 + (1 * 2^-52)) × 2^1023  == 1.7976931348623157 × 10^308 (Ma* Double)";
 }
 
+QString DblNum::outNumber(quint64 value)
+{
+  union representation
+  {
+    double  dblRepresentation;
+    quint64 bitRepresentation;
+  } repr;
+  QString out;
+  repr.bitRepresentation = value;
+  double dblNum = repr.dblRepresentation;
+  QString hexRepresentation = QString("0x%1").arg(value, 16, 16, QChar('0')).toUpper();
+  QString doubleRepresentation = QVariant(dblNum).toString();
+  QString comment;
+  if (true == _examples.contains(value))
+  {
+    comment = _examples[value];
+  }
+  out = QString("%1\t%2\t%3").arg(hexRepresentation).arg(doubleRepresentation).arg(comment);
+  return out;
+}
+
+void DblNum::iterateAll(void)
+{
+  QTextStream out(&outputFile);
+  quint64 min = std::numeric_limits<quint64>::min();
+  quint64 max = std::numeric_limits<quint64>::max();
+  for (quint64 i = min; i <= max; i++)
+  //for (quint64 i = min; i <= 100; i++)
+  {
+    quint64 val = i;
+    QString line = outNumber(val).toStdString().c_str();
+    out << line << endl;
+    //qint64 a = i % 0x1000;
+    if ((i % 0x10000) == 0)
+    {
+      qDebug() << line;
+    }
+  }
+}
+
+void DblNum::iterateExamples(void)
+{
+  QMapIterator<quint64, QString> i(_examples);
+  while (i.hasNext())
+  {
+    quint64 val = i.next().key();
+    //qDebug() << outNumber(val);
+  }
+}
 
 int main(int argc, char *argv[])
 {
   QCoreApplication a(argc, argv);
-  qDebug() << "Test4";
+  DblNum dblNum;
+  dblNum.iterateAll();
   return a.exec();
 }
